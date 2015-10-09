@@ -652,7 +652,7 @@ class FakePool(object):
     def submit(self, fn, *args, **kwargs):
         return FakeFuture(fn, *args, **kwargs)
 
-    def map(self, func, *iterables, timeout=None, chunksize=1):
+    def map(self, func, *iterables, **kwargs):
         return map(func, *iterables)
 
     def shutdown(self, wait=True):
@@ -868,6 +868,7 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
         pool = FakePool()
     else:
         if pool is None:
+            import concurrent.futures
             pool = concurrent.futures.ThreadPoolExecutor(n_queue)
 
     # Initialize active points and calculate likelihoods
@@ -968,6 +969,8 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
 
         it += 1
 
+    sampler.cancel_queue()
+
     # Add remaining active points.
     # After N samples have been taken out, the remaining volume is
     # e^(-N/npoints). Thus, the remaining volume for each active point
@@ -1005,5 +1008,9 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
         ('samples', np.array(saved_v)),
         ('weights', np.exp(np.array(saved_logwt) - logz)),
         ('logvol', np.array(saved_logvol)),
-        ('logl', np.array(saved_logl))
+        ('logl', np.array(saved_logl)),
+        ('q_submitted', sampler.submitted),
+        ('q_cancelled', sampler.cancelled),
+        ('q_unused', sampler.unused),
+        ('q_used', sampler.used),
         ])
