@@ -368,6 +368,39 @@ def test_eggbox():
     assert abs(res.logz - grid_logz) < 3.0 * res.logzerr
 
 
+#------------------------------------------------------------------------------
+# test parallelization
+
+def test_parallel():
+    futures = pytest.importorskip("concurrent.futures")
+    sigma = 0.1
+    mu1 = np.ones(2)
+    mu2 = -np.ones(2)
+    sigma_inv = np.identity(2) / 0.1**2
+
+    def logl(x):
+        dx1 = x - mu1
+        dx2 = x - mu2
+        return np.logaddexp(-np.dot(dx1, np.dot(sigma_inv, dx1)) / 2.0,
+                            -np.dot(dx2, np.dot(sigma_inv, dx2)) / 2.0)
+
+    # Flat prior, over [-5, 5] in both dimensions
+    def prior(x):
+        return 10.0 * x - 5.0
+
+    #(Approximate) analytic evidence for two identical Gaussian blobs,
+    # over a uniform prior [-5:5][-5:5] with density 1/100 in this domain:
+    analytic_logz = np.log(2.0 * 2.0*np.pi*sigma*sigma / 100.)
+
+    res = nestle.sample(logl, prior, 2, method='multi',
+                        npoints=100, rstate=RandomState(0),
+                        pool=nestle.FakePool(), n_queue=8)
+    with futures.ThreadPoolExecutor(8) as pool:
+        res_p = nestle.sample(logl, prior, 2, method='multi',
+                              npoints=100, rstate=RandomState(0),
+                              pool=pool, n_queue=8)
+
+    assert res.logz == res_p.logz
 # -----------------------------------------------------------------------------
 # test utilities
 
