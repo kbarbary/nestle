@@ -371,6 +371,7 @@ def test_eggbox():
 #------------------------------------------------------------------------------
 # test parallelization
 
+@pytest.mark.skipif("not nestle.HAVE_KMEANS")
 def test_parallel():
     futures = pytest.importorskip("concurrent.futures")
     sigma = 0.1
