@@ -560,12 +560,44 @@ class Sampler:
     given some existing set of points."""
 
     def __init__(self, loglikelihood, prior_transform, points, rstate,
-                 options):
+                 options, n_queue, pool):
         self.loglikelihood = loglikelihood
         self.prior_transform = prior_transform
         self.points = points
         self.rstate = rstate
         self.set_options(options)
+        self.n_queue = n_queue
+        self.pool = pool
+        self.queue = []
+        self.submitted = 0
+        self.cancelled = 0
+        self.unused = 0
+        self.used = 0
+
+    def cancel_queue(self):
+        while self.queue:
+            x, v, f = self.queue.pop()
+            if f.cancel():
+                self.cancelled += 1
+            else:
+                # Sorry, already in progress, can't cancel
+                self.unused += 1
+
+    def fill_queue(self):
+        while len(self.queue)<self.n_queue:
+            x = self.suggest_point()
+            v = self.prior_transform(x)
+            self.queue.append((x,v,self.pool.submit(self.loglikelihood,v)))
+            self.submitted += 1
+
+    def get_point_value(self):
+        if not self.queue:
+            self.fill_queue()
+        x, v, f = self.queue.pop(0)
+        r = f.result()
+        self.fill_queue()
+        self.used += 1
+        return x, v, r
 
 
 class ClassicSampler(Sampler):
@@ -627,20 +659,24 @@ class SingleEllipsoidSampler(Sampler):
         self.enlarge = options.get('enlarge', 1.2)
 
     def update(self, pointvol):
+        self.cancel_queue()
         self.ell = bounding_ellipsoid(self.points, pointvol=pointvol,
                                       minvol=True)
         self.ell.scale_to_vol(self.ell.vol * self.enlarge)
+        self.fill_queue()
+
+    def suggest_point(self):
+        while True:
+            u = self.ell.sample(rstate=self.rstate)
+            if np.all(u > 0.) and np.all(u < 1.):
+                break
+        return u
 
     def new_point(self, loglstar):
         ncall = 0
         logl = -float('inf')
         while logl < loglstar:
-            while True:
-                u = self.ell.sample(rstate=self.rstate)
-                if np.all(u > 0.) and np.all(u < 1.):
-                    break
-            v = self.prior_transform(u)
-            logl = self.loglikelihood(v)
+            u, v, logl = self.get_point_value()
             ncall += 1
 
         return u, v, logl, ncall
@@ -654,24 +690,57 @@ class MultiEllipsoidSampler(Sampler):
         self.enlarge = options.get('enlarge', 1.2)
 
     def update(self, pointvol):
+        self.cancel_queue()
         self.ells = bounding_ellipsoids(self.points, pointvol=pointvol)
         for ell in self.ells:
             ell.scale_to_vol(ell.vol * self.enlarge)
+        self.fill_queue()
+
+    def suggest_point(self):
+        while True:
+            u = sample_ellipsoids(self.ells, rstate=self.rstate)
+            if np.all(u > 0.) and np.all(u < 1.):
+                break
+        return u
 
     def new_point(self, loglstar):
         ncall = 0
         logl = -float('inf')
         while logl < loglstar:
-            while True:
-                u = sample_ellipsoids(self.ells, rstate=self.rstate)
-                if np.all(u > 0.) and np.all(u < 1.):
-                    break
-            v = self.prior_transform(u)
-            logl = self.loglikelihood(v)
+            u, v, logl = self.get_point_value()
             ncall += 1
 
         return u, v, logl, ncall
 
+
+# Do not derive from concurrent.futures.Executor because
+# concurrent.futures might not be available. We don't
+# need much functionality anyway.
+class FakePool(object):
+    def __init__(self):
+        pass
+
+    def submit(self, fn, *args, **kwargs):
+        return FakeFuture(fn, *args, **kwargs)
+
+    def map(self, func, *iterables, **kwargs):
+        return map(func, *iterables)
+
+    def shutdown(self, wait=True):
+        pass
+
+
+class FakeFuture(object):
+    def __init__(self, fn, *args, **kwargs):
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+
+    def result(self, timeout=None):
+        return self.fn(*self.args,**self.kwargs)
+
+    def cancel(self):
+        return True
 
 # -----------------------------------------------------------------------------
 # Main entry point
@@ -683,7 +752,8 @@ _SAMPLERS = {'classic': ClassicSampler,
 def sample(loglikelihood, prior_transform, ndim, npoints=100,
            method='single', update_interval=None, npdim=None,
            maxiter=None, maxcall=None, dlogz=None, decline_factor=None,
-           rstate=None, callback=None, **options):
+           rstate=None, callback=None, n_queue=None, pool=None,
+           **options):
     """Perform nested sampling to evaluate Bayesian evidence.
 
     Parameters
@@ -727,7 +797,7 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
         Number of parameters accepted by prior. This might differ from *ndim*
         in the case where a parameter of loglikelihood is dependent upon
         multiple independently distributed parameters, some of which may be
-        nuisance parameters. 
+        nuisance parameters.
 
     maxiter : int, optional
         Maximum number of iterations. Iteration may stop earlier if
@@ -764,8 +834,18 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
         the current iteration number, and ``'logz'``, the current total
         log evidence of all saved points. To simply print these at each
         iteration, use the convience function
-        ``callback=nestle.print_progress``. 
+        ``callback=nestle.print_progress``.
 
+    n_queue : int, optional
+        Carry out evaluation in parallel on this many cores. Default is
+        no parallelism. If pool is not specified, a ThreadPoolExecutor
+        will be created (which may mean little effective parallelism is
+        possible, depending on the objective function).
+
+    pool : concurrent.futures.Executor, optional
+        Use this pool of workers for function evaluation in parallel. Default
+        is sequential evaluation (and does not require the concurrent.futures
+        module). If specified, n_queue must also be specified.
 
     Other Parameters
     ----------------
@@ -854,16 +934,24 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
         if update_interval < 1:
             raise ValueError("update_interval must be >= 1")
 
+    if n_queue is None or n_queue == 1:
+        n_queue = 1
+        pool = FakePool()
+    else:
+        if pool is None:
+            import concurrent.futures
+            pool = concurrent.futures.ThreadPoolExecutor(n_queue)
+
     # Initialize active points and calculate likelihoods
     active_u = rstate.rand(npoints, npdim)  # position in unit cube
     active_v = np.empty((npoints, ndim), dtype=np.float64)  # real params
-    active_logl = np.empty(npoints, dtype=np.float64)  # log likelihood
     for i in range(npoints):
         active_v[i, :] = prior_transform(active_u[i, :])
-        active_logl[i] = loglikelihood(active_v[i, :])
+    active_logl = np.fromiter(pool.map(loglikelihood, active_v),
+                              dtype=np.float64)
 
     sampler = _SAMPLERS[method](loglikelihood, prior_transform, active_u,
-                                rstate, options)
+                                rstate, options, n_queue, pool)
 
     # Initialize values for nested sampling loop.
     saved_v = []  # stored points for posterior results
@@ -955,6 +1043,8 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
 
         it += 1
 
+    sampler.cancel_queue()
+
     # Add remaining active points.
     # After N samples have been taken out, the remaining volume is
     # e^(-N/npoints). Thus, the remaining volume for each active point
@@ -992,5 +1082,9 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
         ('samples', np.array(saved_v)),
         ('weights', np.exp(np.array(saved_logwt) - logz)),
         ('logvol', np.array(saved_logvol)),
-        ('logl', np.array(saved_logl))
+        ('logl', np.array(saved_logl)),
+        ('q_submitted', sampler.submitted),
+        ('q_cancelled', sampler.cancelled),
+        ('q_unused', sampler.unused),
+        ('q_used', sampler.used),
         ])
