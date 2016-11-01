@@ -634,7 +634,7 @@ class SingleEllipsoidSampler(Sampler):
     def new_point(self, loglstar):
         ncall = 0
         logl = -float('inf')
-        while logl < loglstar:
+        while logl <= loglstar:
             while True:
                 u = self.ell.sample(rstate=self.rstate)
                 if np.all(u > 0.) and np.all(u < 1.):
