@@ -624,7 +624,7 @@ class Sampler:
             self.queue.append((x, v, self.pool.submit(self.loglikelihood, v)))
             self.submitted += 1
 
-    def get_point_value(self, should_update):
+    def get_point_value(self):
         """ Get evaluation sequentially from the queue. If we should
             update our proposal distribution, do not refill the queue."""
 
@@ -632,8 +632,7 @@ class Sampler:
             self.fill_queue()
         x, v, f = self.queue.pop(0)
         r = f.result()
-        if not should_update:
-            self.fill_queue()
+        self.fill_queue()
         self.used += 1
         return x, v, r
 
@@ -659,7 +658,7 @@ class ClassicSampler(Sampler):
                 break
         return new_u
 
-    def new_point(self, loglstar, should_update):
+    def new_point(self, loglstar):
         # choose a point at random and copy it
         i = self.rstate.randint(len(self.points))
         u = self.points[i, :]
@@ -713,10 +712,10 @@ class SingleEllipsoidSampler(Sampler):
                 break
         return u
 
-    def new_point(self, loglstar, should_update):
+    def new_point(self, loglstar):
         ncall = 0
         while True:
-            u, v, logl = self.get_point_value(should_update)
+            u, v, logl = self.get_point_value()
             ncall += 1
             if logl >= loglstar:
                 break
@@ -745,10 +744,10 @@ class MultiEllipsoidSampler(Sampler):
                 break
         return u
 
-    def new_point(self, loglstar, should_update):
+    def new_point(self, loglstar):
         ncall = 0
         while True:
-            u, v, logl = self.get_point_value(should_update)
+            u, v, logl = self.get_point_value()
             ncall += 1
             if logl >= loglstar:
                 break
@@ -1018,18 +1017,13 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
         pointvol = expected_vol / npoints
 
         # Update the sampler based on the current active points.
-        # For parallel processing, also finishes evaluating
-        # all ongoing trial points to ensure no likelihood call
-        # is wasted.
-        should_update = since_update >= update_interval
-        if should_update and not sampler.queue:
+        if since_update >= update_interval:
             sampler.update(pointvol)
             since_update = 0
-            should_update = False
 
         # Choose a new point from within the likelihood constraint
         # (having logl > loglstar).
-        u, v, logl, nc = sampler.new_point(loglstar, should_update)
+        u, v, logl, nc = sampler.new_point(loglstar)
 
         # replace worst point with new point
         active_u[worst] = u
