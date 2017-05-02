@@ -591,13 +591,13 @@ class Sampler:
     given some existing set of points."""
 
     def __init__(self, loglikelihood, prior_transform, points, rstate,
-                 options, n_threads, pool):
+                 options, queue_size, pool):
         self.loglikelihood = loglikelihood
         self.prior_transform = prior_transform
         self.points = points
         self.rstate = rstate
         self.set_options(options)
-        self.n_threads = n_threads
+        self.queue_size = queue_size
         self.pool = pool
         self.queue = []
         self.submitted = 0
@@ -618,7 +618,7 @@ class Sampler:
     def fill_queue(self):
         """Fill up the queue with operations."""
 
-        while len(self.queue)<self.n_threads:
+        while len(self.queue)<self.queue_size:
             x = self.propose_point()
             v = self.prior_transform(x)
             self.queue.append((x, v, self.pool.submit(self.loglikelihood, v)))
@@ -651,7 +651,7 @@ class ClassicSampler(Sampler):
         self.ell = bounding_ellipsoid(self.points, pointvol=pointvol)
         self.ell.scale_to_vol(pointvol)
 
-    def propose_point(self, u):
+    def propose_point(self, u, scale):
         while True:
             new_u = u + scale * self.ell.randoffset(rstate=self.rstate)
             if np.all(new_u > 0.) and np.all(new_u < 1.):
@@ -669,7 +669,7 @@ class ClassicSampler(Sampler):
         reject = 0
         ncall = 0
         while ncall < self.steps or accept == 0:
-            new_u = self.propose_point(u)
+            new_u = self.propose_point(u, scale)
             new_v = self.prior_transform(new_u)
             new_logl = self.loglikelihood(new_v)
             if new_logl >= loglstar:
@@ -765,7 +765,7 @@ _SAMPLERS = {'classic': ClassicSampler,
 def sample(loglikelihood, prior_transform, ndim, npoints=100,
            method='single', update_interval=None, npdim=None,
            maxiter=None, maxcall=None, dlogz=None, decline_factor=None,
-           rstate=None, callback=None, n_threads=None, pool=None, **options):
+           rstate=None, callback=None, queue_size=None, pool=None, **options):
     """Perform nested sampling to evaluate Bayesian evidence.
 
     Parameters
@@ -848,15 +848,15 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
         iteration, use the convience function
         ``callback=nestle.print_progress``.
 
-    n_threads: int, optional
-        Carry out evaluation in parallel using this many cores. Each thread
-        proposes new live points independently of each other until one is 
-        selected. Default is no parallelism (n_threads=1). 
+    queue_size: int, optional
+        Carry out evaluation in parallel by queueing up new active point 
+        proposals using at most this many threads. Each thread independently
+        proposes new live points until one is selected. 
+        Default is no parallelism (queue_size=1). 
 
-    pool: concurrent.futures.Executor, optional
-        Use this pool of workers to propose live points in parallel. Default
-        is None. If n_threads>1 and pool is not specified, a 
-        ThreadPoolExecutor will be created.
+    pool: ThreadPoolExecutor
+        Use this pool of workers to propose live points in parallel. If 
+        queue_size>1 and `pool` is not specified, an Exception will be thrown. 
 
 
     Other Parameters
@@ -947,12 +947,12 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
             raise ValueError("update_interval must be >= 1")
 
     # Parallel evaluation.
-    if n_threads is None or n_threads == 1:
-        n_threads = 1
+    if queue_size is None or queue_size == 1:
+        queue_size = 1
         pool = FakePool()
     else:
         if pool is None:
-            pool = concurrent.futures.ThreadPoolExecutor(n_threads)
+            raise ValueError("Missing pool. Please provide a Pool object.")
 
     # Initialize active points and calculate likelihoods
     active_u = rstate.rand(npoints, npdim)  # position in unit cube
@@ -962,7 +962,7 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
     active_logl = np.fromiter(pool.map(loglikelihood, active_v), 
                               dtype=np.float64) # log likelihood
     sampler = _SAMPLERS[method](loglikelihood, prior_transform, active_u,
-                                rstate, options, n_threads, pool)
+                                rstate, options, queue_size, pool)
 
     # Initialize values for nested sampling loop.
     saved_v = []  # stored points for posterior results
