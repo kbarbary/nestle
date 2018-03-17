@@ -765,7 +765,9 @@ _SAMPLERS = {'classic': ClassicSampler,
 def sample(loglikelihood, prior_transform, ndim, npoints=100,
            method='single', update_interval=None, npdim=None,
            maxiter=None, maxcall=None, dlogz=None, decline_factor=None,
-           rstate=None, callback=None, queue_size=None, pool=None, **options):
+           rstate=None, callback=None, queue_size=None, pool=None,
+           logl_args=None, logl_kwargs=None, prior_args=None,
+           prior_kwargs=None, **options):
     """Perform nested sampling to evaluate Bayesian evidence.
 
     Parameters
@@ -857,6 +859,12 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
     pool: ThreadPoolExecutor
         Use this pool of workers to propose live points in parallel. If 
         queue_size>1 and `pool` is not specified, an Exception will be thrown. 
+
+    logl_args, prior_args: list
+        Args passed to the loglikelihood and prior transform
+
+    logl_kwargs, prior_kwargs: dict
+        Kwargs passed to the loglikelihood and prior transform
 
 
     Other Parameters
@@ -953,6 +961,24 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
     else:
         if pool is None:
             raise ValueError("Missing pool. Please provide a Pool object.")
+
+    if logl_args is None:
+        logl_args = []
+
+    if logl_kwargs is None:
+        logl_kwargs = dict()
+
+    if prior_args is None:
+        prior_args = []
+
+    if prior_kwargs is None:
+        prior_kwargs = dict()
+
+    loglikelihood = _FunctionWrapper(
+        loglikelihood, logl_args, logl_kwargs, name='loglikelihood')
+
+    prior_transform = _FunctionWrapper(
+        prior_transform, prior_args, prior_kwargs, name='prior_transform')
 
     # Initialize active points and calculate likelihoods
     active_u = rstate.rand(npoints, npdim)  # position in unit cube
@@ -1093,3 +1119,31 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
         ('logvol', np.array(saved_logvol)),
         ('logl', np.array(saved_logl))
         ])
+
+
+class _FunctionWrapper(object):
+    """
+    A hack to make functions pickleable when `args` or `kwargs` are
+    also included. Based on the implementation in
+    `emcee <http://dan.iel.fm/emcee/>`_.
+
+    """
+
+    def __init__(self, func, args, kwargs, name='input'):
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+        self.name = name
+
+    def __call__(self, x):
+        try:
+            return self.func(x, *self.args, **self.kwargs)
+        except:
+            import traceback
+            print("Exception while calling {0} function:".format(self.name))
+            print("  params:", x)
+            print("  args:", self.args)
+            print("  kwargs:", self.kwargs)
+            print("  exception:")
+            traceback.print_exc()
+            raise
