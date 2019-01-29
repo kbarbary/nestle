@@ -932,7 +932,7 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
                          "'multi' method.")  # pragma: no cover
 
     if method not in _SAMPLERS:
-        raise ValueError("Unknown method: {:r}".format(method))
+        raise ValueError("Unknown method: {!r}".format(method))
 
     if npoints < 2 * ndim:
         warnings.warn("You really want to make npoints >= 2 * ndim!")
