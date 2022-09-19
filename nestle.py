@@ -123,7 +123,7 @@ def resample_equal(samples, weights, rstate=None):
     # make N subdivisions, and choose positions with a consistent random offset
     positions = (rstate.random() + np.arange(N)) / N
 
-    idx = np.zeros(N, dtype=np.int)
+    idx = np.zeros(N, dtype=int)
     cumulative_sum = np.cumsum(weights)
     i, j = 0, 0
     while i < N:
