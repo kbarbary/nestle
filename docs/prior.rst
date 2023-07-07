@@ -50,7 +50,7 @@ be::
 or equivalently::
 
     def prior_transform(x):
-        return np.array([2., 20.]) * x + np.array([-1., 10.])
+        return np.array([2., 20.]) * x + np.array([-1., -10.])
 
 Incidentally, the simplest possible prior to define would be a uniform
 distribution between 0 and 1 in all parameters, for which the
