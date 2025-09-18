@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nestle"
+dynamic = ["version"]
+description = "Nested sampling algorithms for evaluating Bayesian evidence"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Kyle Barbary", email = "kylebarbary@gmail.com"}
+]
+maintainers = [
+    {name = "Kyle Barbary", email = "kylebarbary@gmail.com"}
+]
+keywords = ["nested sampling", "bayesian", "astronomy", "statistics"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Intended Audience :: Science/Research",
+]
+requires-python = ">=3.7"
+dependencies = [
+    "numpy",
+]
+
+[project.urls]
+Homepage = "http://github.com/kbarbary/nestle"
+Documentation = "http://kbarbary.github.io/nestle"
+Repository = "http://github.com/kbarbary/nestle"
+Issues = "http://github.com/kbarbary/nestle/issues"
+
+[tool.setuptools]
+py-modules = ["nestle"]
+
+[tool.setuptools.dynamic]
+version = {attr = "nestle.__version__"}
