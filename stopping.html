@@ -1,0 +1,187 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stopping Criterion &mdash; nestle 0.2.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery.css?v=d2d258e8" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-binder.css?v=f4aeca0c" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-dataframe.css?v=2082cf3c" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=37f418d5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="API" href="api.html" />
+    <link rel="prev" title="The Prior Transform" href="prior.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            nestle
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="examples/index.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="prior.html">The Prior Transform</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Stopping Criterion</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#estimated-remaining-evidence">Estimated remaining evidence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#declining-weight-of-saved-samples">Declining weight of saved samples</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="devdocs.html">Developers’ Docs</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">nestle</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Stopping Criterion</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/stopping.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="stopping-criterion">
+<h1>Stopping Criterion<a class="headerlink" href="#stopping-criterion" title="Link to this heading"></a></h1>
+<p>Nested sampling has no well-defined stopping point. As iterations
+continue, the active points sample a smaller and smaller region of
+prior space. This can continue indefinitely (up to the limits of your
+machine). Unlike typical MCMC methods, we don’t gain any additional
+precision on the results by letting the algorithm run longer; the
+precision is determined at the outset by the number of active
+points. So, we want to stop iterations as soon as we think the active
+points are doing a “pretty good job” sampling the remaining prior
+volume – once we’ve converged to the highest-likelihood regions such
+that the likelihood is relatively flat within the remaining prior
+volume.</p>
+<p>For an arbitrary likelihood surface, there’s no way to ever guarantee
+that we’ve found the highest likelihood region. There could always be
+some vanishingly small volume with such high likelihood that it
+dominates the evidence integral (but this is a generic problem with
+sampling methods). In practice, there are a couple heuristic stopping
+criteria that work pretty well for determining when we’ve found the
+highest-likelihood regions.</p>
+<section id="estimated-remaining-evidence">
+<h2>Estimated remaining evidence<a class="headerlink" href="#estimated-remaining-evidence" title="Link to this heading"></a></h2>
+<p>In this criteria, we estimate the maximum remaining evidence and stop
+when the contribution of the remaining evidence to the total evidence
+falls below some threshold. The remaining evidence is difficult to
+estimate (this is what we are trying to calculate in the algorithm
+after all!), but the current active points give <em>some</em> idea of how
+much evidence could remain. More specifically, the current active
+point with the highest likelihood gives an estimate of the higest
+likelihood in the region. We estimate the remaining evidence at iteration i
+according to</p>
+<div class="math notranslate nohighlight">
+\[\mathcal{Z}_\mathrm{est} = \mathcal{L}_\mathrm{max} X_i\]</div>
+<p>where <span class="math notranslate nohighlight">\(X_i\)</span> is the remaining prior volume.
+The stopping criteria is then based on the ratio between the estimated
+total evidence and the current evidence:</p>
+<div class="math notranslate nohighlight">
+\[\log (\mathcal{Z}_i + \mathcal{Z}_\mathrm{est}) - \log \mathcal{Z}_i &lt;
+\mathrm{thresh}\]</div>
+<p>where thresh is a user-defined parameter that defaults to 0.5. This is the
+<code class="docutils literal notranslate"><span class="pre">dlogz</span></code> option in <code class="xref py py-obj docutils literal notranslate"><span class="pre">nestle.sample</span></code>.</p>
+<p>One can show that the expectation value of <span class="math notranslate nohighlight">\(\mathcal{L}_\mathrm{max}\)</span> is
+<span class="math notranslate nohighlight">\(\mathcal{L}_{i + N log N}\)</span>, where <em>N</em> is the number of active points.
+This means that the highest-likelihood active point will be equivalent to a
+point saved <span class="math notranslate nohighlight">\(N log N\)</span> iterations later, after the remaining volume has
+shrunk by a factor of <em>N</em>.</p>
+</section>
+<section id="declining-weight-of-saved-samples">
+<h2>Declining weight of saved samples<a class="headerlink" href="#declining-weight-of-saved-samples" title="Link to this heading"></a></h2>
+<p>This method is based on looking for a flattening of the likelihood region
+being traversed. While the likelihood of saved samples will always increase,
+the increase will become smaller and smaller as the likelihood flattens.
+We look for a critical point where the likelihood increase becomes smaller than
+the decrease in the prior volume.</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\mathcal{L}_{i+1} / \mathcal{L}_i &amp;&lt; X_i / X_{i+1}  \\
+                                  &amp;&lt; e^{1/N}        \\
+\log \mathcal{L}_{i+1} - \log \mathcal{L}_i &amp;&lt; 1/N\end{split}\]</div>
+<p>This is equivalent to a declining sample weight (likelihood times
+sample prior volume).  There is significant sampling noise in the
+likelihood values, so we cannot stop immediately once this condition
+is fulfilled. Instead, we look stop when this condition is fulfilled
+for a number of repeated samples. In <code class="xref py py-obj docutils literal notranslate"><span class="pre">nestle.sample</span></code>, this is set by
+the <code class="docutils literal notranslate"><span class="pre">decline_factor</span></code> parameter, which instructs the algorithm to
+stop after <code class="docutils literal notranslate"><span class="pre">decline_factor</span> <span class="pre">*</span> <span class="pre">nsamples</span></code> consecutive samples
+fulfilling the condition. This stopping criteria is inactive by
+default.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="prior.html" class="btn btn-neutral float-left" title="The Prior Transform" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="api.html" class="btn btn-neutral float-right" title="API" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2014-2025, Kyle Barbary and contributors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

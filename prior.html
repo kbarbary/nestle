@@ -1,0 +1,216 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Prior Transform &mdash; nestle 0.2.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery.css?v=d2d258e8" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-binder.css?v=f4aeca0c" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-dataframe.css?v=2082cf3c" />
+      <link rel="stylesheet" type="text/css" href="_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=37f418d5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Stopping Criterion" href="stopping.html" />
+    <link rel="prev" title="Gaussian Shells" href="examples/plot_shells.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            nestle
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="examples/index.html">Examples</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">The Prior Transform</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#uniform-priors">Uniform priors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#non-uniform-priors">Non-uniform priors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#why">Why?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="stopping.html">Stopping Criterion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="devdocs.html">Developers’ Docs</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">nestle</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">The Prior Transform</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/prior.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="the-prior-transform">
+<h1>The Prior Transform<a class="headerlink" href="#the-prior-transform" title="Link to this heading"></a></h1>
+<p>The <code class="xref py py-obj docutils literal notranslate"><span class="pre">nestle.sample</span></code> function takes two user-defined functions as
+inputs. The first function should give the natural logarithm of the
+likelihood function of interest. The second function is a “prior
+transform.” <em>What’s up with that?</em></p>
+<p>The prior transform function is used to specify the Bayesian prior for
+the problem, in a round-about way. It is a transformation from a space
+where variables are independently and uniformly distributed between 0
+and 1 to the parameter space of interest. For independent parameters,
+this would be the product of the <a class="reference external" href="https://en.wikipedia.org/wiki/Quantile_function">inverse cumulative distribution
+function</a> (also
+known as the <em>percent point function</em> or <em>quantile function</em>) for each
+parameter.</p>
+<section id="uniform-priors">
+<h2>Uniform priors<a class="headerlink" href="#uniform-priors" title="Link to this heading"></a></h2>
+<p>This is easier to illustrate with a concrete example.  Suppose we
+wanted a uniform prior in the range [-5, 5.) in all variables:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}p(x) \propto \left\{
+             \begin{array}{ll}
+               1 \quad -5 \le x &lt; 5\\
+               0 \quad {\rm otherwise}
+             \end{array}
+           \right.\end{split}\]</div>
+<p>The prior transform would be:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">prior_transform</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="mf">10.</span> <span class="o">*</span> <span class="n">x</span> <span class="o">-</span> <span class="mf">5.</span>
+</pre></div>
+</div>
+<p>because if <code class="docutils literal notranslate"><span class="pre">x</span></code> is an array of numbers between 0 and 1, the result
+will be an array of numbers between -5 and 5.</p>
+<p>For a slightly more complex example, suppose we have problem with two
+variables where the prior on the first variable is a uniform
+distribution between -1 and 1 and the prior on the second variable is
+a uniform distribution between -10 and 10. The prior transform would
+be:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">prior_transform</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">2.</span> <span class="o">*</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mf">1.</span><span class="p">,</span> <span class="mf">20.</span> <span class="o">*</span> <span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mf">10.</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>or equivalently:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">prior_transform</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">2.</span><span class="p">,</span> <span class="mf">20.</span><span class="p">])</span> <span class="o">*</span> <span class="n">x</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">10.</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Incidentally, the simplest possible prior to define would be a uniform
+distribution between 0 and 1 in all parameters, for which the
+transform would be <code class="docutils literal notranslate"><span class="pre">lambda</span> <span class="pre">x:</span> <span class="pre">x</span></code>.</p>
+</section>
+<section id="non-uniform-priors">
+<h2>Non-uniform priors<a class="headerlink" href="#non-uniform-priors" title="Link to this heading"></a></h2>
+<p>Suppose we wish to specify a normal distribution for our prior, in two
+dimensions. We can use the inverse cumulative distribution function
+for the normal distribution, <a class="reference external" href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.ndtri.html#scipy.special.ndtri" title="(in SciPy v1.16.2)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scipy.special.ndtri</span></code></a>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.special</span><span class="w"> </span><span class="kn">import</span> <span class="n">ndtri</span>
+
+<span class="n">prior_transform</span> <span class="o">=</span> <span class="n">ndtri</span>
+</pre></div>
+</div>
+<p>This specifies a normal distribution with mean 0 and standard
+deviation 1 in all dimensions. To specify a different mean and
+standard deviation, simply transform the output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">prior_transform</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">mu</span> <span class="o">+</span> <span class="n">sigma</span> <span class="o">*</span> <span class="n">ndtri</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>where <code class="docutils literal notranslate"><span class="pre">mu</span></code> is an array giving the mean in each dimension and
+<code class="docutils literal notranslate"><span class="pre">sigma</span></code> is an array giving the standard deviation in each dimension.</p>
+<p>The distributions in <a class="reference external" href="https://docs.scipy.org/doc/scipy/reference/stats.html#module-scipy.stats" title="(in SciPy v1.16.2)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scipy.stats</span></code></a> (particularly the <code class="docutils literal notranslate"><span class="pre">ppf</span></code> method)
+might be particuarly useful in constructing more complex priors.</p>
+</section>
+<section id="why">
+<h2>Why?<a class="headerlink" href="#why" title="Link to this heading"></a></h2>
+<p><strong>Why not combine the prior and likelihood in a single function (giving
+the posterior) as in, e.g., emcee?</strong></p>
+<p>Unlike traditional MCMC, nested sampling starts by randomly sampling
+from the entire parameter space. This is not possible without
+specifying some sort of contraints on the parameters. Thus the user
+would still have to specify bounds on all the parameters. You could
+use <code class="xref py py-obj docutils literal notranslate"><span class="pre">nestle.sample</span></code> this way: pass a “loglikelihood” function that in
+fact returns the log of the posterior, and then specify a prior
+transform that is uniform in some parameter range (as illustrated in
+the first example). This will give valid samples. However, the
+evidence will be affected by the range of the prior. A wider uniform
+prior decreases the weight of the high-likelihood regions in the
+evidence integral, leading to a lower evidence.</p>
+<p>There are a couple advantages to specifying the prior as a
+transform rather than simply as bounds. First, it naturally allows
+priors that extend to infinity but have finite integrals, such as the
+normal distribution illustrated above. Second, assuming the prior
+transform is computationally cheap, this lets us cheaply draw samples
+according to the prior. We will (proportionally) avoid evaluating the
+likelihood in regions we know to have small prior values. (This
+preferential sampling is accounted for in the results.)</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="examples/plot_shells.html" class="btn btn-neutral float-left" title="Gaussian Shells" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="stopping.html" class="btn btn-neutral float-right" title="Stopping Criterion" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2014-2025, Kyle Barbary and contributors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
