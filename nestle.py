@@ -1,27 +1,27 @@
 # License is MIT: see LICENSE.md.
 """Nestle: nested sampling routines to evaluate Bayesian evidence."""
 
-from __future__ import print_function, division
-
 import sys
 import warnings
 import math
 
 import numpy as np
+
 try:
     from scipy.cluster.vq import kmeans2
+
     HAVE_KMEANS = True
 except ImportError:  # pragma: no cover
     HAVE_KMEANS = False
 
-__all__ = ["sample", "print_progress", "mean_and_cov", "resample_equal",
-           "Result"]
-__version__ = "0.2.0"
+__all__ = ["sample", "print_progress", "mean_and_cov", "resample_equal", "Result"]
+__version__ = "0.2.1"
 
 SQRTEPS = math.sqrt(float(np.finfo(np.float64).eps))
 
 # -----------------------------------------------------------------------------
 # Helpers
+
 
 def vol_prefactor(n):
     """Volume constant for an n-dimensional sphere:
@@ -30,16 +30,16 @@ def vol_prefactor(n):
     for n odd :  2 * (2pi)^((n-1)/2) / (1 * 3 * ... * n)
     """
     if n % 2 == 0:
-        f = 1.
+        f = 1.0
         i = 2
         while i <= n:
-            f *= (2. / i * math.pi)
+            f *= 2.0 / i * math.pi
             i += 2
     else:
-        f = 2.
+        f = 2.0
         i = 3
         while i <= n:
-            f *= (2. / i * math.pi)
+            f *= 2.0 / i * math.pi
             i += 2
 
     return f
@@ -49,22 +49,7 @@ def randsphere(n, rstate=np.random):
     """Draw a random point within an n-dimensional unit sphere"""
 
     z = rstate.randn(n)
-    return z * rstate.rand()**(1./n) / np.sqrt(np.sum(z**2))
-
-
-def random_choice(a, p, rstate=np.random):
-    """replacement for numpy.random.choice (only in numpy 1.7+)"""
-
-    if abs(np.sum(p) - 1.) > SQRTEPS:  # same tol as in np.random.choice.
-        raise ValueError("probabilities do not sum to 1")
-
-    r = rstate.rand()
-    i = 0
-    t = p[i]
-    while t < r:
-        i += 1
-        t += p[i]
-    return i
+    return z * rstate.rand() ** (1.0 / n) / np.sqrt(np.sum(z**2))
 
 
 def resample_equal(samples, weights, rstate=None):
@@ -82,7 +67,7 @@ def resample_equal(samples, weights, rstate=None):
 
     weights : `~numpy.ndarray`
         Weight of each sample. Shape is (N,).
-    
+
     Returns
     -------
     equal_weight_samples : `~numpy.ndarray`
@@ -112,7 +97,7 @@ def resample_equal(samples, weights, rstate=None):
 
     """
 
-    if abs(np.sum(weights) - 1.) > SQRTEPS:  # same tol as in np.random.choice.
+    if abs(np.sum(weights) - 1.0) > SQRTEPS:  # same tol as in np.random.choice.
         raise ValueError("weights do not sum to 1")
 
     if rstate is None:
@@ -123,7 +108,7 @@ def resample_equal(samples, weights, rstate=None):
     # make N subdivisions, and choose positions with a consistent random offset
     positions = (rstate.random() + np.arange(N)) / N
 
-    idx = np.zeros(N, dtype=np.int)
+    idx = np.zeros(N, dtype=np.int64)
     cumulative_sum = np.cumsum(weights)
     i, j = 0, 0
     while i < N:
@@ -156,20 +141,26 @@ class Result(dict):
     def __repr__(self):
         if self.keys():
             m = max(map(len, list(self.keys()))) + 1
-            return '\n'.join([k.rjust(m) + ': ' + repr(v)
-                              for k, v in self.items()])
+            return "\n".join([k.rjust(m) + ": " + repr(v) for k, v in self.items()])
         else:
             return self.__class__.__name__ + "()"
 
     def summary(self):
         """Return a nicely formatted string giving summary."""
-        return ("niter: {:d}\n"
-                "ncall: {:d}\n"
-                "nsamples: {:d}\n"
-                "logz: {:6.3f} +/- {:6.3f}\n"
-                "h: {:6.3f}"
-                .format(self.niter, self.ncall, len(self.samples),
-                        self.logz, self.logzerr, self.h))
+        return (
+            "niter: {:d}\n"
+            "ncall: {:d}\n"
+            "nsamples: {:d}\n"
+            "logz: {:6.3f} +/- {:6.3f}\n"
+            "h: {:6.3f}".format(
+                self.niter,
+                self.ncall,
+                len(self.samples),
+                self.logz,
+                self.logzerr,
+                self.h,
+            )
+        )
 
 
 def mean_and_cov(x, weights):
@@ -203,7 +194,7 @@ def mean_and_cov(x, weights):
     wsum = np.sum(weights)
     w2sum = np.sum(weights**2)
 
-    cov = wsum / (wsum**2 - w2sum) * np.einsum('i,ij,ik', weights, dx, dx)
+    cov = wsum / (wsum**2 - w2sum) * np.einsum("i,ij,ik", weights, dx, dx)
 
     return mean, cov
 
@@ -217,13 +208,13 @@ def print_progress(info):
         Dictionary containing keys ``'it'`` and ``'logz'``.
     """
 
-    print("\r\033[Kit={:6d} logz={:8f}".format(info['it'], info['logz']),
-          end='')
+    print("\r\033[Kit={:6d} logz={:8f}".format(info["it"], info["logz"]), end="")
     sys.stdout.flush()  # because flush keyword not in print() in py2.7
 
 
 # -----------------------------------------------------------------------------
 # Ellipsoid
+
 
 class Ellipsoid(object):
     """An N-ellipsoid.
@@ -247,14 +238,14 @@ class Ellipsoid(object):
 
     def __init__(self, ctr, a):
         self.n = len(ctr)
-        self.ctr = ctr    # center coordinates
-        self.a = a        # ~ inverse of covariance of points contained
+        self.ctr = ctr  # center coordinates
+        self.a = a  # ~ inverse of covariance of points contained
         self.vol = vol_prefactor(self.n) / np.sqrt(np.linalg.det(a))
 
         # eigenvalues (l) are a^-2, b^-2, ... (lengths of principle axes)
         # eigenvectors (v) are normalized principle axes
         l, v = np.linalg.eigh(a)
-        self.axlens = 1. / np.sqrt(l)
+        self.axlens = 1.0 / np.sqrt(l)
 
         # Scaled eigenvectors are the axes: axes[:,i] is the i-th
         # axis.  Multiplying this matrix by a vector will transform a
@@ -304,7 +295,7 @@ class Ellipsoid(object):
             Coordinates within the ellipsoid.
         """
 
-        x = np.empty((nsamples, self.n), dtype=np.float)
+        x = np.empty((nsamples, self.n), dtype=np.float64)
         for i in range(nsamples):
             x[i, :] = self.sample(rstate=rstate)
         return x
@@ -317,6 +308,7 @@ class Ellipsoid(object):
 # Functions for determining the ellipsoid or set of ellipsoids bounding a
 # set of points.
 
+
 def make_eigvals_positive(a, targetprod):
     """For the symmetric square matrix ``a``, increase any zero eigenvalues
     to fulfill the given target product of eigenvalues.
@@ -324,17 +316,17 @@ def make_eigvals_positive(a, targetprod):
     Returns a (possibly) new matrix."""
 
     w, v = np.linalg.eigh(a)  # Use eigh because we assume a is symmetric.
-    mask = w < 1.e-10
+    mask = w < 1.0e-10
     if np.any(mask):
-        nzprod = np.product(w[~mask])  # product of nonzero eigenvalues
+        nzprod = np.prod(w[~mask])  # product of nonzero eigenvalues
         nzeros = mask.sum()  # number of zero eigenvalues
-        w[mask] = (targetprod / nzprod) ** (1./nzeros)  # adjust zero eigvals
+        w[mask] = (targetprod / nzprod) ** (1.0 / nzeros)  # adjust zero eigvals
         a = np.dot(np.dot(v, np.diag(w)), np.linalg.inv(v))  # re-form cov
 
     return a
 
 
-def bounding_ellipsoid(x, pointvol=0., minvol=False):
+def bounding_ellipsoid(x, pointvol=0.0, minvol=False):
     """Calculate bounding ellipsoid containing a set of points x.
 
     Parameters
@@ -356,14 +348,14 @@ def bounding_ellipsoid(x, pointvol=0., minvol=False):
     # If there is only a single point, return an N-sphere with volume `pointvol`
     # centered at the point.
     if npoints == 1:
-        r = (pointvol / vol_prefactor(ndim))**(1./ndim)
-        return Ellipsoid(x[0], (1. / r**2) * np.identity(ndim))
+        r = (pointvol / vol_prefactor(ndim)) ** (1.0 / ndim)
+        return Ellipsoid(x[0], (1.0 / r**2) * np.identity(ndim))
 
     # Calculate covariance of points
     ctr = np.mean(x, axis=0)
     delta = x - ctr
     cov = np.cov(delta, rowvar=0)
-    
+
     # when ndim = 1, np.cov returns a 0-d array. Make it a 1x1 2-d array.
     if ndim == 1:
         cov = np.atleast_2d(cov)
@@ -375,7 +367,7 @@ def bounding_ellipsoid(x, pointvol=0., minvol=False):
     # we are supposing the points are uniformly distributed within
     # an ellipse, so the same factor holds. Expand `cov`
     # to compensate for that when defining the ellipse matrix:
-    cov *= (ndim + 2)
+    cov *= ndim + 2
 
     # Ensure that ``cov`` is nonsingular.
     # It can be singular when the ellipsoid has zero volume, which happens
@@ -384,7 +376,7 @@ def bounding_ellipsoid(x, pointvol=0., minvol=False):
     # combination of others). When this happens, we expand the ellipse
     # in the zero dimensions to fulfill the volume expected from
     # ``pointvol``.
-    targetprod = (npoints * pointvol / vol_prefactor(ndim))**2
+    targetprod = (npoints * pointvol / vol_prefactor(ndim)) ** 2
     cov = make_eigvals_positive(cov, targetprod)
 
     # The matrix defining the ellipsoid.
@@ -394,15 +386,15 @@ def bounding_ellipsoid(x, pointvol=0., minvol=False):
     # Points should obey x^T A x <= 1, so we calculate x^T A x for
     # each point and then scale A up or down to make the
     # "outermost" point obey x^T A x = 1.
-    # 
+    #
     # fast way to compute delta[i] @ A @ delta[i] for all i.
-    f = np.einsum('...i, ...i', np.tensordot(delta, a, axes=1), delta)
+    f = np.einsum("...i, ...i", np.tensordot(delta, a, axes=1), delta)
     fmax = np.max(f)
 
     # Due to round-off errors, we actually scale the ellipse so the outermost
     # point obeys x^T A x < 1 - (a bit), so that all the points will
     # *definitely* obey x^T A x < 1.
-    one_minus_a_bit = 1. - SQRTEPS
+    one_minus_a_bit = 1.0 - SQRTEPS
 
     if fmax > one_minus_a_bit:
         a *= one_minus_a_bit / fmax
@@ -417,7 +409,7 @@ def bounding_ellipsoid(x, pointvol=0., minvol=False):
     return ell
 
 
-def _bounding_ellipsoids(x, ell, pointvol=0.):
+def _bounding_ellipsoids(x, ell, pointvol=0.0):
     """Internal bounding ellipsoids method for when a bounding ellipsoid for
     the entire set has already been calculated.
 
@@ -444,12 +436,12 @@ def _bounding_ellipsoids(x, ell, pointvol=0.):
 
     # starting cluster centers for kmeans (k=2)
     p1, p2 = ell.major_axis_endpoints()  # returns two 1-d arrays
-    start_ctrs = np.vstack((p1, p2)) # shape is (k, N) = (2, N)
+    start_ctrs = np.vstack((p1, p2))  # shape is (k, N) = (2, N)
 
     # Split points into two clusters using k-means clustering with k=2
     # centroid = (2, ndim) ; label = (npoints,)
     # [Each entry in `label` is 0 or 1, corresponding to cluster number]
-    centroid, label = kmeans2(x, k=start_ctrs, iter=10, minit='matrix')
+    centroid, label = kmeans2(x, k=start_ctrs, iter=10, minit="matrix")
 
     # Get points in each cluster.
     xs = [x[label == k, :] for k in (0, 1)]  # points in each cluster
@@ -461,22 +453,23 @@ def _bounding_ellipsoids(x, ell, pointvol=0.):
         return [ell]
 
     # Bounding ellipsoid for each cluster, enlarging to minimum volume.
-    ells = [bounding_ellipsoid(xi, pointvol=pointvol, minvol=True)
-            for xi in xs]
+    ells = [bounding_ellipsoid(xi, pointvol=pointvol, minvol=True) for xi in xs]
 
     # If the total volume decreased by a significant amount,
     # then we will accept the split into subsets and try to perform the
     # algorithm on each subset.
     if ells[0].vol + ells[1].vol < 0.5 * ell.vol:
-        return (_bounding_ellipsoids(xs[0], ells[0], pointvol=pointvol) +
-                _bounding_ellipsoids(xs[1], ells[1], pointvol=pointvol))
+        return _bounding_ellipsoids(
+            xs[0], ells[0], pointvol=pointvol
+        ) + _bounding_ellipsoids(xs[1], ells[1], pointvol=pointvol)
 
     # Otherwise, see if the total ellipse volume is significantly greater
     # than expected. If it is, this indicates that there may be more than 2
     # clusters and we should try to subdivide further.
-    if ell.vol > 2. * npoints * pointvol:
-        out = (_bounding_ellipsoids(xs[0], ells[0], pointvol=pointvol) +
-               _bounding_ellipsoids(xs[1], ells[1], pointvol=pointvol))
+    if ell.vol > 2.0 * npoints * pointvol:
+        out = _bounding_ellipsoids(
+            xs[0], ells[0], pointvol=pointvol
+        ) + _bounding_ellipsoids(xs[1], ells[1], pointvol=pointvol)
 
         # only accept split if volume decreased significantly
         if sum(e.vol for e in out) < 0.5 * ell.vol:
@@ -486,7 +479,7 @@ def _bounding_ellipsoids(x, ell, pointvol=0.):
     return [ell]
 
 
-def bounding_ellipsoids(x, pointvol=0.):
+def bounding_ellipsoids(x, pointvol=0.0):
     """Calculate a set of ellipses that bound the points.
 
     Parameters
@@ -514,7 +507,7 @@ def bounding_ellipsoids(x, pointvol=0.):
 def sample_ellipsoids(ells, rstate=np.random):
     """Chose sample(s) randomly distributed within a set of
     (possibly overlapping) ellipsoids.
-    
+
     Parameters
     ----------
     ells : list of Ellipsoid
@@ -522,7 +515,7 @@ def sample_ellipsoids(ells, rstate=np.random):
     Returns
     -------
     x : 1-d ndarray
-        Coordinates within the ellipsoids. 
+        Coordinates within the ellipsoids.
     """
 
     nells = len(ells)
@@ -532,8 +525,8 @@ def sample_ellipsoids(ells, rstate=np.random):
 
     # Select an ellipsoid at random, according to volumes
     vols = np.array([ell.vol for ell in ells])
-    i = random_choice(nells, vols / vols.sum(), rstate=rstate)
-    
+    i = rstate.choice(nells, p=vols / vols.sum())
+
     # Select a point from the ellipsoid
     x = ells[i].sample(rstate=rstate)
 
@@ -551,8 +544,10 @@ def sample_ellipsoids(ells, rstate=np.random):
     else:
         return sample_ellipsoids(ells, rstate=rstate)
 
+
 # -----------------------------------------------------------------------------
 # Classes for dealing with non-parallel calls
+
 
 class FakePool(object):
     """A fake Pool for serial function evaluations."""
@@ -568,7 +563,8 @@ class FakePool(object):
 
     def shutdown(self):
         pass
-    
+
+
 class FakeFuture(object):
     """A fake Future to mimic function calls."""
 
@@ -583,15 +579,18 @@ class FakeFuture(object):
     def cancel(self):
         return True
 
+
 # -----------------------------------------------------------------------------
 # Sampler classes
+
 
 class Sampler:
     """A sampler simply selects a new point obeying the likelihood bound,
     given some existing set of points."""
 
-    def __init__(self, loglikelihood, prior_transform, points, rstate,
-                 options, queue_size, pool):
+    def __init__(
+        self, loglikelihood, prior_transform, points, rstate, options, queue_size, pool
+    ):
         self.loglikelihood = loglikelihood
         self.prior_transform = prior_transform
         self.points = points
@@ -618,15 +617,15 @@ class Sampler:
     def fill_queue(self):
         """Fill up the queue with operations."""
 
-        while len(self.queue)<self.queue_size:
+        while len(self.queue) < self.queue_size:
             x = self.propose_point()
             v = self.prior_transform(x)
             self.queue.append((x, v, self.pool.submit(self.loglikelihood, v)))
             self.submitted += 1
 
     def get_point_value(self):
-        """ Get evaluation sequentially from the queue. If we should
-            update our proposal distribution, do not refill the queue."""
+        """Get evaluation sequentially from the queue. If we should
+        update our proposal distribution, do not refill the queue."""
 
         if not self.queue:
             self.fill_queue()
@@ -636,12 +635,13 @@ class Sampler:
         self.used += 1
         return x, v, r
 
+
 class ClassicSampler(Sampler):
     """Picks an active point at random and evolves it with a
     Metropolis-Hastings style MCMC with fixed number of iterations."""
 
     def set_options(self, options):
-        self.steps = options.get('steps', 20)
+        self.steps = options.get("steps", 20)
 
     def update(self, pointvol):
         """Calculate an ellipsoid to get the rough shape of the point
@@ -654,7 +654,7 @@ class ClassicSampler(Sampler):
     def propose_point(self, u, scale):
         while True:
             new_u = u + scale * self.ell.randoffset(rstate=self.rstate)
-            if np.all(new_u > 0.) and np.all(new_u < 1.):
+            if np.all(new_u > 0.0) and np.all(new_u < 1.0):
                 break
         return new_u
 
@@ -664,7 +664,7 @@ class ClassicSampler(Sampler):
         u = self.points[i, :]
 
         # evolve it.
-        scale = 1.
+        scale = 1.0
         accept = 0
         reject = 0
         ncall = 0
@@ -682,9 +682,9 @@ class ClassicSampler(Sampler):
 
             # adjust scale, aiming for acceptance ratio of 0.5.
             if accept > reject:
-                scale *= math.exp(1. / accept)
+                scale *= math.exp(1.0 / accept)
             if accept < reject:
-                scale /= math.exp(1. / reject)
+                scale /= math.exp(1.0 / reject)
 
             ncall += 1
 
@@ -696,19 +696,18 @@ class SingleEllipsoidSampler(Sampler):
     from within that ellipsoid."""
 
     def set_options(self, options):
-        self.enlarge = options.get('enlarge', 1.2)
+        self.enlarge = options.get("enlarge", 1.2)
 
     def update(self, pointvol):
         self.empty_queue()
-        self.ell = bounding_ellipsoid(self.points, pointvol=pointvol,
-                                      minvol=True)
+        self.ell = bounding_ellipsoid(self.points, pointvol=pointvol, minvol=True)
         self.ell.scale_to_vol(self.ell.vol * self.enlarge)
         self.fill_queue()
 
     def propose_point(self):
         while True:
             u = self.ell.sample(rstate=self.rstate)
-            if np.all(u > 0.) and np.all(u < 1.):
+            if np.all(u > 0.0) and np.all(u < 1.0):
                 break
         return u
 
@@ -728,7 +727,7 @@ class MultiEllipsoidSampler(Sampler):
     from within joint distribution."""
 
     def set_options(self, options):
-        self.enlarge = options.get('enlarge', 1.2)
+        self.enlarge = options.get("enlarge", 1.2)
 
     def update(self, pointvol):
         self.empty_queue()
@@ -740,7 +739,7 @@ class MultiEllipsoidSampler(Sampler):
     def propose_point(self):
         while True:
             u = sample_ellipsoids(self.ells, rstate=self.rstate)
-            if np.all(u > 0.) and np.all (u < 1.):
+            if np.all(u > 0.0) and np.all(u < 1.0):
                 break
         return u
 
@@ -758,16 +757,35 @@ class MultiEllipsoidSampler(Sampler):
 # -----------------------------------------------------------------------------
 # Main entry point
 
-_SAMPLERS = {'classic': ClassicSampler,
-             'single': SingleEllipsoidSampler,
-             'multi': MultiEllipsoidSampler}
+_SAMPLERS = {
+    "classic": ClassicSampler,
+    "single": SingleEllipsoidSampler,
+    "multi": MultiEllipsoidSampler,
+}
 
-def sample(loglikelihood, prior_transform, ndim, npoints=100,
-           method='single', update_interval=None, npdim=None,
-           maxiter=None, maxcall=None, dlogz=None, decline_factor=None,
-           rstate=None, callback=None, queue_size=None, pool=None,
-           logl_args=None, logl_kwargs=None, prior_args=None,
-           prior_kwargs=None, **options):
+
+def sample(
+    loglikelihood,
+    prior_transform,
+    ndim,
+    npoints=100,
+    method="single",
+    update_interval=None,
+    npdim=None,
+    maxiter=None,
+    maxcall=None,
+    dlogz=None,
+    decline_factor=None,
+    rstate=None,
+    callback=None,
+    queue_size=None,
+    pool=None,
+    logl_args=None,
+    logl_kwargs=None,
+    prior_args=None,
+    prior_kwargs=None,
+    **options,
+):
     """Perform nested sampling to evaluate Bayesian evidence.
 
     Parameters
@@ -851,14 +869,14 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
         ``callback=nestle.print_progress``.
 
     queue_size: int, optional
-        Carry out evaluation in parallel by queueing up new active point 
+        Carry out evaluation in parallel by queueing up new active point
         proposals using at most this many threads. Each thread independently
-        proposes new live points until one is selected. 
-        Default is no parallelism (queue_size=1). 
+        proposes new live points until one is selected.
+        Default is no parallelism (queue_size=1).
 
     pool: ThreadPoolExecutor
-        Use this pool of workers to propose live points in parallel. If 
-        queue_size>1 and `pool` is not specified, an Exception will be thrown. 
+        Use this pool of workers to propose live points in parallel. If
+        queue_size>1 and `pool` is not specified, an Exception will be thrown.
 
     logl_args, prior_args: list
         Args passed to the loglikelihood and prior transform
@@ -927,9 +945,10 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
     if maxcall is None:
         maxcall = sys.maxsize
 
-    if method == 'multi' and not HAVE_KMEANS:
-        raise ValueError("scipy.cluster.vq.kmeans2 is required for the "
-                         "'multi' method.")  # pragma: no cover
+    if method == "multi" and not HAVE_KMEANS:
+        raise ValueError(
+            "scipy.cluster.vq.kmeans2 is required for the 'multi' method."
+        )  # pragma: no cover
 
     if method not in _SAMPLERS:
         raise ValueError("Unknown method: {!r}".format(method))
@@ -942,8 +961,9 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
 
     # Stopping criterion.
     if dlogz is not None and decline_factor is not None:
-        raise ValueError("Cannot specify two separate stopping criteria: "
-                         "decline_factor and dlogz")
+        raise ValueError(
+            "Cannot specify two separate stopping criteria: decline_factor and dlogz"
+        )
     elif dlogz is None and decline_factor is None:
         dlogz = 0.5
 
@@ -975,20 +995,24 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
         prior_kwargs = dict()
 
     loglikelihood = _FunctionWrapper(
-        loglikelihood, logl_args, logl_kwargs, name='loglikelihood')
+        loglikelihood, logl_args, logl_kwargs, name="loglikelihood"
+    )
 
     prior_transform = _FunctionWrapper(
-        prior_transform, prior_args, prior_kwargs, name='prior_transform')
+        prior_transform, prior_args, prior_kwargs, name="prior_transform"
+    )
 
     # Initialize active points and calculate likelihoods
     active_u = rstate.rand(npoints, npdim)  # position in unit cube
     active_v = np.empty((npoints, ndim), dtype=np.float64)  # real params
     for i in range(npoints):
         active_v[i, :] = prior_transform(active_u[i, :])
-    active_logl = np.fromiter(pool.map(loglikelihood, active_v), 
-                              dtype=np.float64) # log likelihood
-    sampler = _SAMPLERS[method](loglikelihood, prior_transform, active_u,
-                                rstate, options, queue_size, pool)
+    active_logl = np.fromiter(
+        pool.map(loglikelihood, active_v), dtype=np.float64
+    )  # log likelihood
+    sampler = _SAMPLERS[method](
+        loglikelihood, prior_transform, active_u, rstate, options, queue_size, pool
+    )
 
     # Initialize values for nested sampling loop.
     saved_v = []  # stored points for posterior results
@@ -997,17 +1021,14 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
     saved_logwt = []
     h = 0.0  # Information, initially 0.
     logz = -1e300  # ln(Evidence Z), initially Z=0.
-    logvol = math.log(1.0 - math.exp(-1.0/npoints))  # first point removed will
-                                                     # have volume 1-e^(1/n)
+    logvol = math.log(1.0 - math.exp(-1.0 / npoints))  # first point removed will
+    # have volume 1-e^(1/n)
     ncall = npoints  # number of calls we already made
 
     # Initialize sampler
-    sampler.update(1./npoints)
+    sampler.update(1.0 / npoints)
 
-    callback_info = {'it': 0,
-                     'logz': logz,
-                     'active_u': active_u,
-                     'sampler': sampler}
+    callback_info = {"it": 0, "logz": logz, "active_u": active_u, "sampler": sampler}
 
     # Nested sampling loop.
     ndecl = 0
@@ -1025,9 +1046,11 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
 
         # update evidence Z and information h.
         logz_new = np.logaddexp(logz, logwt)
-        h = (math.exp(logwt - logz_new) * active_logl[worst] +
-             math.exp(logz - logz_new) * (h + logz) -
-             logz_new)
+        h = (
+            math.exp(logwt - logz_new) * active_logl[worst]
+            + math.exp(logz - logz_new) * (h + logz)
+            - logz_new
+        )
         logz = logz_new
 
         # Add worst object to samples.
@@ -1089,9 +1112,11 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
     for i in range(npoints):
         logwt = logvol + active_logl[i]
         logz_new = np.logaddexp(logz, logwt)
-        h = (math.exp(logwt - logz_new) * active_logl[i] +
-             math.exp(logz - logz_new) * (h + logz) -
-             logz_new)
+        h = (
+            math.exp(logwt - logz_new) * active_logl[i]
+            + math.exp(logz - logz_new) * (h + logz)
+            - logz_new
+        )
         logz = logz_new
         saved_v.append(np.array(active_v[i]))
         saved_logwt.append(logwt)
@@ -1105,20 +1130,24 @@ def sample(loglikelihood, prior_transform, ndim, npoints=100,
         if h > -SQRTEPS:
             h = 0.0
         else:
-            raise RuntimeError("Negative h encountered (h={}). Please report "
-                               "this as a likely bug.".format(h))
+            raise RuntimeError(
+                "Negative h encountered (h={}). Please report "
+                "this as a likely bug.".format(h)
+            )
 
-    return Result([
-        ('niter', it + 1),
-        ('ncall', ncall),
-        ('logz', logz),
-        ('logzerr', math.sqrt(h / npoints)),
-        ('h', h),
-        ('samples', np.array(saved_v)),
-        ('weights', np.exp(np.array(saved_logwt) - logz)),
-        ('logvol', np.array(saved_logvol)),
-        ('logl', np.array(saved_logl))
-        ])
+    return Result(
+        [
+            ("niter", it + 1),
+            ("ncall", ncall),
+            ("logz", logz),
+            ("logzerr", math.sqrt(h / npoints)),
+            ("h", h),
+            ("samples", np.array(saved_v)),
+            ("weights", np.exp(np.array(saved_logwt) - logz)),
+            ("logvol", np.array(saved_logvol)),
+            ("logl", np.array(saved_logl)),
+        ]
+    )
 
 
 class _FunctionWrapper(object):
@@ -1129,7 +1158,7 @@ class _FunctionWrapper(object):
 
     """
 
-    def __init__(self, func, args, kwargs, name='input'):
+    def __init__(self, func, args, kwargs, name="input"):
         self.func = func
         self.args = args
         self.kwargs = kwargs
@@ -1140,6 +1169,7 @@ class _FunctionWrapper(object):
             return self.func(x, *self.args, **self.kwargs)
         except:
             import traceback
+
             print("Exception while calling {0} function:".format(self.name))
             print("  params:", x)
             print("  args:", self.args)

@@ -1,4 +1,9 @@
-v0.2.0 (unreleased)
+v0.2.1 (2025-10-07)
+===================
+
+- Modernize build and remove Python 2 support.
+
+v0.2.0 (2016-11-04)
 ===================
 
 - Add `nestle.resample_equal()` utility function.

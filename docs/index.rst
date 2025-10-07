@@ -4,7 +4,7 @@ Nestle
 
 /ˈnesəl/ *(rhymes with "wrestle")*
 
-.. image:: _images/sphx_glr_plot_ellipsoids_001.png
+.. image:: examples/images/sphx_glr_plot_ellipsoids_001.png
    :width: 280px
    :align: right
    :target: examples/plot_ellipsoids.html
@@ -24,7 +24,7 @@ finding global maxima.
 Install
 =======
 
-Nestle is compatible with both Python and Python 2. It requires numpy 1.6+ and, optionally, scipy. Install with pip::
+Nestle depends on numpy and, optionally, scipy. Install with pip::
 
     pip install nestle
 
